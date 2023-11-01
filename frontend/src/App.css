@@ -1,0 +1,88 @@
+.App {
+
+  text-align: center;
+
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background-color: #333;
+}
+
+.navbar-logo {
+  color: #fff;
+  font-size: 1.5rem;
+}
+
+.video {
+  width: 300px;
+  height: 200px;
+}
+
+.title {
+  margin-bottom: 10%;
+}
+
+.searchbar {}
+
+
+.search {
+  background-color: lightgrey;
+  padding-left: 1.5rem;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+  display: flex;
+  flex-direction: row;
+}
+
+.searchLabel {
+  text-align: left;
+  padding-top: 0.5rem;
+  padding-right: 1rem;
+
+}
+
+.timefilter {
+  margin-left: 2%;
+}
+
+
+
+.entity {
+  display: flex;
+  margin-bottom: 1rem;
+  margin-left: 20%;
+}
+
+
+.entity_info {
+  display: flex;
+  flex-direction: column;
+  width: 30rem;
+  margin-left: 5rem;
+  margin-top: 1rem;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.entity_search {
+  margin-top: 2%;
+
+}
+
+
+
+.typeahead {
+  width: 40%
+}
+
+.filter {
+  padding-top: 0.25rem;
+}
+
+.filter_date {
+  margin-left: 1rem;
+  margin-right: 1rem;
+}

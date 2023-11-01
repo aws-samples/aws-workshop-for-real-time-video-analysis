@@ -1,17 +1,19 @@
-## My Project
+# aws-workshop-forreal-time-video-analysis
+This repository contains all the code and assets used for below workshop which demonstrates near real time analysis of video feeds using Amazon Kinesis stream with webrtc, Amazon Rekognition services:
 
-TODO: Fill this README out!
+<Workshop URL>
 
-Be sure to:
 
-* Change the title in this README
-* Edit your repository description on GitHub
+## Getting started
+This project contains code and assets for below components used in workshop mentioned above:-
 
-## Security
+1. Cloud formation templates under templates directory.
+2. All lambda function code under lambdas directory.
+3. Front end application code under frontend directory.
 
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
 
-## License
+All these componensts are independent and to run/setup this project, please follow the instructions as per the workshop. To build/deploy all these components individually follow the instructions in the individual component readme files.
 
-This library is licensed under the MIT-0 License. See the LICENSE file.
 
+## Author
+Sanjeev Kumar, Solutions Architect (AWS India)
