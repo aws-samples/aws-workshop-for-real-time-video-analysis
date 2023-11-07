@@ -12,7 +12,7 @@ To package this lambda function code, please make sure that you have python 3.7 
 
 Go to root of project run below command in terminal:
 
-`pip install --target ./package requests`
+`pip install --target ./package requests requests-aws4auth`
 
 Run below command to create a zip file
 

@@ -14,7 +14,7 @@ const EntityList = ({ results }) => {
       {filtered?.length > 0 ?
         <h3 className="entity_search"> Search Results</h3> : null
       }
-      {filtered?.map((result) => {
+      {filtered?.map((result, index) => {
         const video_url = result._source.videoClipName;
 
         const absolute_video_url = 'https://' + CLOUDFRONT_URL + "/" + video_url
@@ -22,7 +22,7 @@ const EntityList = ({ results }) => {
         const ts = result._source.ts
         const timestamp = new Date(parseInt(base_ts) + parseInt(ts))
         return (
-          <>
+          <div key={index}>
             <hr />
             <div className="entity" key={result.name}>
               <video className="video" controls>
@@ -34,7 +34,7 @@ const EntityList = ({ results }) => {
               </section>
             </div>
             <hr />
-          </>
+          </div>
         );
       })}
     </div>

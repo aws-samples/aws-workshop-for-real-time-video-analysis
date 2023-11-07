@@ -9,7 +9,7 @@ const SearchEntities = (props) => {
   const [selected, setSelected] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [startTime, setStartTime] = useState(new Date().setDate(new Date().getDate() - 1));
-  const [endTime, setEndTime] = useState(new Date());
+  const [endTime, setEndTime] = useState(new Date().setDate(new Date().getDate() + 1));
 
   useEffect(() => {
     fetchEntities().then((entities) => {
@@ -49,8 +49,10 @@ const SearchEntities = (props) => {
       .then((res) => res.json())
       .then((entitiesData) => {
         const results = entitiesData?.hits?.hits
+        console.log('start time:' + startTime)
         const filtered = results ? results.filter((ele, index) => {
-          if (ele._source.base_timestamp > Date.parse(startTime) && ele._source.base_timestamp < Date.parse(endTime)) {
+          console.log('target ts: ' + ele._source.base_timestamp)
+          if (ele._source.base_timestamp > startTime && ele._source.base_timestamp < endTime) {
             return true
           }
           return false;
@@ -84,7 +86,7 @@ const SearchEntities = (props) => {
             onChange={changeHandler}
             options={entities}
             placeholder="Search Entity..."
-            selected={selected}
+            selected={[selected]}
           />
         </div>
         <div className="timefilter">
