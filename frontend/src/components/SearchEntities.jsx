@@ -5,11 +5,15 @@ import { TimeFilter } from './TimeFilter';
 
 const SearchEntities = (props) => {
 
+  const nextDay = new Date()
+  nextDay.setDate(nextDay.getDate() + 1);
+  const prevDay = new Date()
+  prevDay.setDate(prevDay.getDate() - 1)
   const [entities, setEntites] = useState([])
-  const [selected, setSelected] = useState("")
+  const [selected] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
-  const [startTime, setStartTime] = useState(new Date().setDate(new Date().getDate() - 1));
-  const [endTime, setEndTime] = useState(new Date().setDate(new Date().getDate() + 1));
+  const [startTime, setStartTime] = useState(prevDay);
+  const [endTime, setEndTime] = useState(nextDay);
 
   useEffect(() => {
     fetchEntities().then((entities) => {
@@ -31,6 +35,7 @@ const SearchEntities = (props) => {
 
 
   const onStartTimeChange = (value) => {
+    console.log(1)
     setStartTime(value)
   }
 
@@ -41,6 +46,7 @@ const SearchEntities = (props) => {
 
 
   const changeHandler = async (current) => {
+    console.log(2)
     const search_term = current && current.length > 0 ? current[0].name : searchTerm
     setSearchTerm(search_term)
     return fetch(
@@ -49,9 +55,7 @@ const SearchEntities = (props) => {
       .then((res) => res.json())
       .then((entitiesData) => {
         const results = entitiesData?.hits?.hits
-        console.log('start time:' + startTime)
         const filtered = results ? results.filter((ele, index) => {
-          console.log('target ts: ' + ele._source.base_timestamp)
           if (ele._source.base_timestamp > startTime && ele._source.base_timestamp < endTime) {
             return true
           }
@@ -86,7 +90,7 @@ const SearchEntities = (props) => {
             onChange={changeHandler}
             options={entities}
             placeholder="Search Entity..."
-            selected={[selected]}
+            selected={selected}
           />
         </div>
         <div className="timefilter">
