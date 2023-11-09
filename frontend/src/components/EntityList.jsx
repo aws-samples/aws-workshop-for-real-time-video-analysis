@@ -6,8 +6,7 @@ const EntityList = ({ results }) => {
   const filtered = results.filter((ele, index) => results.findIndex(obj => obj.name === ele.name && obj._source.ts === ele._source.ts) === index)
 
   const generateDatabaseDateTime = (date) => {
-    console.log(date.toLocaleString())
-    return date.toLocaleString().replace(",", " ").substring(0, 20);
+    return date.toLocaleString().replace(",", " ");
   }
 
   return (
