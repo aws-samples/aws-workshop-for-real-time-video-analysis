@@ -15,8 +15,3 @@ Once all the packages are installed then create a zip file by going to the root 
 `zip -r kvs_processor.zip *`
 
 This will create a lambda zip file and can be deployed to AWS enviornment.
-
-
-
-
-

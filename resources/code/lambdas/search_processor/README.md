@@ -24,19 +24,3 @@ Now package the main python file to zip created above:
 `zip search_processor.zip main.py`
 
 This will create a lambda zip file and can be deployed to AWS enviornment.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
