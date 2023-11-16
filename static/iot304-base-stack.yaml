@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  InstanceOwner:
+    Type: String
+    Description: Assumed role username of Cloud9 owner, in the format 'Role/username'. Leave blank to assign leave the instance assigned to the role running the CloudFormation template.
+    Default: ""
+
+Conditions:
+  AssignCloud9Owner: !Not [!Equals [!Ref InstanceOwner, ""]]
+
+Resources:
+  Cloud9Instance:
+    Type: AWS::Cloud9::EnvironmentEC2
+    Properties:
+      AutomaticStopTimeMinutes: 240
+      ConnectionType: CONNECT_SSH
+      Description: KVS workshop environment
+      ImageId: resolve:ssm:/aws/service/cloud9/amis/ubuntu-18.04-x86_64
+      InstanceType: m5.large
+      Name: kvs-workshop-environment
+      OwnerArn:
+        Fn::If:
+          - AssignCloud9Owner
+          - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:assumed-role/${InstanceOwner}
+          - Ref: AWS::NoValue
+
+  OpenSearchDomain:
+    Type: AWS::OpenSearchService::Domain
+    Properties:
+      DomainName: kvs-workshop-domain
+      EngineVersion: "OpenSearch_2.9"
+      AdvancedSecurityOptions:
+        Enabled: true
+        InternalUserDatabaseEnabled: true
+        MasterUserOptions:
+          MasterUserName: admin
+          MasterUserPassword: Amazon90!
+      ClusterConfig:
+        InstanceCount: 1
+        InstanceType: "t3.small.search"
+      CognitoOptions:
+        Enabled: false
+      DomainEndpointOptions:
+        CustomEndpointEnabled: false
+        EnforceHTTPS: true
+        TLSSecurityPolicy: Policy-Min-TLS-1-2-2019-07
+      EBSOptions:
+        EBSEnabled: true
+        VolumeSize: 10
+        VolumeType: "gp2"
+      EncryptionAtRestOptions:
+        Enabled: true
+      NodeToNodeEncryptionOptions:
+        Enabled: true
+      AccessPolicies:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action: "es:*"
+            Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/kvs-workshop-domain/*"
+
+
+Outputs:
+  OpenSearchURL:
+    Value: !GetAtt OpenSearchDomain.DomainEndpoint
