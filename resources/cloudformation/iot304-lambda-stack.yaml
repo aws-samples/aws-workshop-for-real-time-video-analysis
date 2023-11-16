@@ -1,0 +1,364 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Lambda function for kvs processing.
+Parameters:
+  OpenSearchApiUrl:
+    Type: String
+  KVSStreamName:
+    Type: String
+Resources:
+  rekognitionlambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Role: !GetAtt LambdaRole.Arn
+      Handler: main.lambda_handler
+      Timeout: 900
+      MemorySize: 1024
+      Code:
+        S3Bucket: ws-assets-prod-iad-r-pdx-f3b3f9f1a7d6a3d0
+        S3Key: 0c7e49a5-b5c4-4f6d-b26b-9b2d8b5cbd2f/rekognition_lambda.zip
+      Environment:
+        Variables:
+          OPEN_SEARCH_API_URL: !Ref OpenSearchApiUrl
+      Description: Analyze the video clips from S3 and notify via SNS
+      TracingConfig:
+        Mode: Active
+
+  RekognitionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - rekognition.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonKinesisFullAccess
+        - arn:aws:iam::aws:policy/service-role/AmazonRekognitionServiceRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonKinesisFullAccess
+        - arn:aws:iam::aws:policy/AmazonKinesisVideoStreamsFullAccess
+        - arn:aws:iam::aws:policy/AmazonOpenSearchServiceFullAccess
+        - arn:aws:iam::aws:policy/AmazonRekognitionFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/CloudWatchFullAccess
+      Policies:
+        - PolicyName: AWSLambdaBasicExecutionRole-kvs-workshop
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: logs:CreateLogGroup
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/kvs-workshop-lambda:*"
+        - PolicyName: AWSLambdaElasticsearchExecutionRole-kvs-workshop
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: es:ESHttpPost
+                Resource: "*"
+        - PolicyName: passRole
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: "iam:PassRole"
+                Resource: !GetAtt RekognitionRole.Arn
+
+  CloudFrontOriginIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: "origin identity"
+
+  S3BucketVideo:
+    DependsOn: CloudFrontOriginIdentity
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName:
+        Fn::Join:
+          - "-"
+          - - "video-bucket"
+            - !Ref "AWS::AccountId"
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3BucketVideo
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              CanonicalUser:
+                Fn::GetAtt: [CloudFrontOriginIdentity, S3CanonicalUserId]
+            Action: "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${S3BucketVideo}/*"
+
+  MyCloudFrontDistribution:
+    DependsOn: BucketPolicy
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: "CloudFront distribution for my S3 bucket"
+        Origins:
+          - Id: "MyS3Origin"
+            DomainName: !GetAtt S3BucketVideo.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginIdentity}"
+
+        DefaultCacheBehavior:
+          TargetOriginId: "MyS3Origin"
+          ForwardedValues:
+            QueryString: false
+          ViewerProtocolPolicy: "redirect-to-https"
+
+        Enabled: true
+
+        DefaultRootObject: "index.html"
+  SnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Join:
+          - "-"
+          - - "AmazonRekognition"
+            - !Ref "AWS::AccountId"
+      Subscription:
+        - Endpoint: !GetAtt rekognitionlambda.Arn
+          Protocol: lambda
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SnsTopic
+      FunctionName: !GetAtt rekognitionlambda.Arn
+
+  searchlambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Role: !GetAtt LambdaRole.Arn
+      Handler: main.lambda_handler
+      Timeout: 900
+      MemorySize: 1024
+      Code:
+        S3Bucket: ws-assets-prod-iad-r-pdx-f3b3f9f1a7d6a3d0
+        S3Key: 0c7e49a5-b5c4-4f6d-b26b-9b2d8b5cbd2f/search_lambda.zip
+      Environment:
+        Variables:
+          OPEN_SEARCH_API_URL: !Ref OpenSearchApiUrl
+      Description: Send search queries to Opensearch APi
+      TracingConfig:
+        Mode: Active
+
+  kvslambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs16.x
+      Role: !GetAtt LambdaRole.Arn
+      Handler: index.handler
+      Timeout: 900
+      MemorySize: 1024
+      Code:
+        S3Bucket: ws-assets-prod-iad-r-pdx-f3b3f9f1a7d6a3d0
+        S3Key: 0c7e49a5-b5c4-4f6d-b26b-9b2d8b5cbd2f/kvs_lambda.zip
+      Environment:
+        Variables:
+          KVS_STREAM_NAME: !Ref KVSStreamName
+          SNS_TOPIC_NAME: !GetAtt SnsTopic.TopicArn
+          REK_ROLE_ARN: !GetAtt RekognitionRole.Arn
+          S3_BUCKET_NAME: !Ref S3BucketVideo
+      Description: Process kvs stream and store clips in s3 and initiate label processing
+      TracingConfig:
+        Mode: Active
+
+  searchApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Search API Gateway
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: search-api-gateway
+
+  searchApiGatewayOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref searchApiGateway
+      ResourceId: !GetAtt searchApiGateway.RootResourceId
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,PUT,POST,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  searchApiGatewayRootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt searchlambda.Arn
+      ResourceId: !GetAtt searchApiGateway.RootResourceId
+      RestApiId: !Ref searchApiGateway
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  searchApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - searchApiGatewayRootMethod
+      - searchApiGatewayOptionsMethod
+    Properties:
+      RestApiId: !Ref searchApiGateway
+      StageName: prod
+
+  lambdaApiGatewayInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt searchlambda.Arn
+      Principal: apigateway.amazonaws.com
+
+  StatesExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - !Sub states.${AWS::Region}.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: StatesExecutionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "lambda:InvokeFunction"
+                Resource: "*"
+  KVSStateMachine:
+    Type: "AWS::StepFunctions::StateMachine"
+    Properties:
+      DefinitionString: !Sub
+        - |-
+          {
+            "Comment": "A description of my state machine",
+            "StartAt": "Choice",
+            "States": {
+              "Choice": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.doContinue",
+                    "BooleanEquals": true,
+                    "Next": "Wait"
+                  }
+                ],
+                "Default": "Graceful Stop"
+              },
+              "Wait": {
+                "Type": "Wait",
+                "Seconds": 60,
+                "Next": "Lambda Invoke"
+              },
+              "Lambda Invoke": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "OutputPath": "$.Payload",
+                "Parameters": {
+                  "Payload.$": "$",
+                  "FunctionName": "${lambdaArn}:$LATEST"
+                },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2
+                  }
+                ],
+                "Next": "Choice"
+              },
+              "Graceful Stop": {
+                "Type": "Wait",
+                "Seconds": 5,
+                "End": true
+              }
+            }
+          }
+        - { lambdaArn: !GetAtt [kvslambda, Arn] }
+      RoleArn: !GetAtt [StatesExecutionRole, Arn]
+
+Outputs:
+  StepFunctionARN:
+    Description: "Step function ARN"
+    Value: !GetAtt [KVSStateMachine, Arn]
+  APIGWURL:
+    Description: "Search API URL"
+    Value: !Join
+      - ""
+      - - "https://"
+        - !Ref searchApiGateway
+        - ".execute-api.us-west-2.amazonaws.com/prod"
+  LambdaRole:
+    Value: !GetAtt LambdaRole.Arn
+  MyCloudFrontDistribution:
+    Value: !GetAtt MyCloudFrontDistribution.DomainName

@@ -80,7 +80,3 @@ exports.handler = async (event, context, callback) => {
   console.log('Processing Successful for current execution, Returning back to Orchestrator step function for further processing')
   return { doContinue: true }
 }
-
-
-
-
