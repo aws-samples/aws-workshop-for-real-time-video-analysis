@@ -68,5 +68,7 @@ Resources:
             Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/kvs-workshop-domain/*"
 
 Outputs:
+  OpenSearchARN:
+    Value: !GetAtt OpenSearchDomain.Arn
   OpenSearchURL:
     Value: !GetAtt OpenSearchDomain.DomainEndpoint
